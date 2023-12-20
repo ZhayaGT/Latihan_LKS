@@ -1,0 +1,200 @@
+using System;
+using System.Data;
+using System.Drawing;
+using System.Linq;
+using System.Windows.Forms;
+using Tes_Soal_W2.Database;
+
+namespace Tes_Soal_W2
+{
+    public partial class WinformCRUD : Form
+    {
+        EsemkaCorporationEntities1 entities = new EsemkaCorporationEntities1();
+
+        public WinformCRUD()
+        {
+            InitializeComponent();
+            InitializeDataGridView();
+        }
+
+        private void InitializeDataGridView()
+        {
+            GetData();
+
+            // Menambahkan tombol Edit dan Delete pada setiap baris DataGridView
+            AddEditButtonColumn();
+            AddDeleteButtonColumn();
+        }
+
+        private void GetData()
+        {
+            // Memuat data dari database ke DataGridView
+            var departments = entities.departments.ToList();
+            bindingSource1.DataSource = departments;
+        }
+
+        private void AddEditButtonColumn()
+        {
+            // Menambahkan kolom Edit button
+            DataGridViewButtonColumn editButtonColumn = new DataGridViewButtonColumn();
+            editButtonColumn.HeaderText = "Edit";
+            editButtonColumn.Name = "Edit";
+            editButtonColumn.Text = "Edit";
+            editButtonColumn.UseColumnTextForButtonValue = true;
+            dataGridView1.Columns.Add(editButtonColumn);
+        }
+
+        private void AddDeleteButtonColumn()
+        {
+            // Menambahkan kolom Delete button
+            DataGridViewButtonColumn deleteButtonColumn = new DataGridViewButtonColumn();
+            deleteButtonColumn.HeaderText = "Delete";
+            deleteButtonColumn.Name = "Delete";
+            deleteButtonColumn.Text = "Delete";
+            deleteButtonColumn.UseColumnTextForButtonValue = true;
+            dataGridView1.Columns.Add(deleteButtonColumn);
+        }
+
+        private void save_Bttn_Click(object sender, EventArgs e)
+        {
+            // Validasi input
+            if (string.IsNullOrWhiteSpace(name_Tb.Text) || string.IsNullOrWhiteSpace(abbreviation_Tb.Text))
+            {
+                MessageBox.Show("Nama dan singkatan harus diisi!", "Peringatan", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            // Menambahkan data baru ke database
+            department newDepartment = new department
+            {
+                name = name_Tb.Text,
+                abbreviation = abbreviation_Tb.Text,
+                created_at = DateTime.Now
+            };
+
+            entities.departments.Add(newDepartment);
+            entities.SaveChanges();
+
+            // Memuat kembali data setelah penyimpanan
+            GetData();
+
+            // Mengosongkan TextBox setelah penyimpanan
+            name_Tb.Clear();
+            abbreviation_Tb.Clear();
+        }
+
+        private void dataGridView1_CellBeginEdit(object sender, DataGridViewCellCancelEventArgs e)
+        {
+            // Hanya izinkan pengeditan jika tombol Edit pada baris yang sesuai ditekan
+            if (e.ColumnIndex != dataGridView1.Columns["Edit"].Index || e.RowIndex < 0)
+            {
+                e.Cancel = true;
+            }
+        }
+
+        // ...
+
+        private void dataGridView1_CellContentClick_1(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex >= 0)
+            {
+                if (e.ColumnIndex == dataGridView1.Columns["Edit"].Index)
+                {
+                    // Implementasi logika edit di sini
+                    int departmentId = Convert.ToInt32(dataGridView1.Rows[e.RowIndex].Cells["id"].Value);
+                    // Lakukan operasi edit sesuai kebutuhan
+                    // Misalnya: EditForm editForm = new EditForm(departmentId);
+                    // editForm.ShowDialog();
+                    // Kemudian panggil GetData() untuk memuat kembali data setelah edit
+
+                    SelectRowById(departmentId);
+
+                    // Aktifkan pengeditan pada baris yang dipilih
+                    EnableEditingOnSelectedRow();
+                }
+
+                if (e.ColumnIndex == dataGridView1.Columns["Delete"].Index)
+                {
+                    // Implementasi logika delete di sini
+                    int departmentId = Convert.ToInt32(dataGridView1.Rows[e.RowIndex].Cells["id"].Value);
+                    var departmentToDelete = entities.departments.Find(departmentId);
+
+                    if (departmentToDelete != null)
+                    {
+                        // Soft delete: Set deleted_at menjadi waktu sekarang
+                        departmentToDelete.deleted_at = DateTime.Now;
+
+                        entities.SaveChanges();
+
+                        // Kemudian panggil GetData() untuk memuat kembali data setelah delete
+                        GetData();
+                    }
+                }
+            }
+        }
+
+        private void dataGridView1_CellFormatting(object sender, DataGridViewCellFormattingEventArgs e)
+        {
+            if (e.RowIndex >= 0 && e.ColumnIndex == dataGridView1.Columns["Delete"].Index)
+            {
+                var cell = dataGridView1.Rows[e.RowIndex].Cells["Delete"];
+
+                // Pemeriksaan apakah deleted_at sudah diisi
+                if (cell.Value != null && cell.Value != DBNull.Value)
+                {
+                    // Nonaktifkan tombol delete dan atur warna teks
+                    cell.ReadOnly = false;
+                    cell.Style.ForeColor = Color.Red;
+                }
+                else
+                {
+                    // Aktifkan tombol delete dan atur warna teks
+                    cell.ReadOnly = false;
+                    cell.Style.ForeColor = dataGridView1.DefaultCellStyle.ForeColor;
+                }
+            }
+        }
+
+        private void cancel_Bttn_Click(object sender, EventArgs e)
+        {
+            name_Tb.Clear();
+            abbreviation_Tb.Clear();
+        }
+
+        private void SelectRowById(int departmentId)
+        {
+            // Loop melalui setiap baris untuk mencari ID yang sesuai
+            foreach (DataGridViewRow row in dataGridView1.Rows)
+            {
+                int rowId = Convert.ToInt32(row.Cells["id"].Value);
+
+                // Jika ID baris cocok dengan ID yang dicari, pilih baris tersebut
+                if (rowId == departmentId)
+                {
+                    row.Selected = true;
+                }
+                else
+                {
+                    // Batalkan pemilihan untuk baris lainnya
+                    row.Selected = false;
+                }
+            }
+        }
+
+        private void EnableEditingOnSelectedRow()
+        {
+            // Aktifkan pengeditan pada sel-sel baris yang dipilih
+            foreach (DataGridViewCell cell in dataGridView1.SelectedCells)
+            {
+                // Kecuali kolom "Edit" dan kolom yang menunjukkan ID
+                if (cell.OwningColumn.Name != "Edit" && cell.OwningColumn.Name != "id" && cell.OwningColumn.Name != "Delete")
+                {
+                    cell.ReadOnly = false;
+                }
+            }
+
+            // ...
+
+        }
+    }
+}
